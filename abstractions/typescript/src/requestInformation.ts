@@ -3,26 +3,24 @@ import { ReadableStream } from 'web-streams-polyfill/es2018';
 import { Parsable } from "./serialization";
 import { RequestOption } from "./requestOption";
 import { RequestAdapter } from "./requestAdapter";
-import { URL } from "url";
 import * as urlTpl from "uri-template-lite";
 
 /** This class represents an abstract HTTP request. */
 export class RequestInformation {
     /** The URI of the request. */
-    private uri?: URL;
+    private uri?: string;
     /** The path parameters for the request. */
-    public pathParameters: Map<string, unknown> = new Map<string, unknown>();
+    public pathParameters: Record<string, unknown> = {};
     /** The URL template for the request */
     public urlTemplate?: string;
     /** Gets the URL of the request  */
-    public get URL(): URL {
-        const rawUrl = this.pathParameters.get(RequestInformation.raw_url_key);
+    public get URL(): string {
+        const rawUrl = this.pathParameters[RequestInformation.raw_url_key];
         if(this.uri) {
             return this.uri;
         } else if (rawUrl) {
-            const value = new URL(rawUrl as string);
-            this.URL = value;
-            return value;
+            this.URL = rawUrl as string;
+            return rawUrl as string;
         } else if(!this.queryParameters) {
             throw new Error("queryParameters cannot be undefined");
         } else if(!this.pathParameters) {
@@ -32,22 +30,21 @@ export class RequestInformation {
         } else {
             const template = new urlTpl.URI.Template(this.urlTemplate);
             const data = {} as { [key: string]: unknown };
-            this.queryParameters.forEach((v, k) => {
-                if(v) data[k] = v;
-            });
-            this.pathParameters.forEach((v, k) => {
-                if(v) data[k] = v;
-            });
-            const result = template.expand(data);
-            return new URL(result);
+            for(const key in this.queryParameters){
+                if(key) data[key] = this.queryParameters[key];
+            };
+
+            for(const key in this.pathParameters){
+                if(key) data[key] = this.queryParameters[key];
+            };
+
+            return template.expand(data);
         }   
     }
     /** Sets the URL of the request */
-    public set URL(url: URL) {
+    public set URL(url: string) {
         if(!url) throw new Error("URL cannot be undefined");
         this.uri = url;
-        this.queryParameters.clear();
-        this.pathParameters.clear();
     }
     public static raw_url_key = "request-raw-url";
     /** The HTTP method for the request */
@@ -55,7 +52,7 @@ export class RequestInformation {
     /** The Request Body. */
     public content?: ReadableStream;
     /** The Query Parameters of the request. */
-    public queryParameters: Map<string, string | number | boolean | undefined> = new Map<string, string | number | boolean | undefined>(); //TODO: case insensitive
+    public queryParameters: Record<string, string | number | boolean | undefined> = {}; //TODO: case insensitive
     /** The Request Headers. */
     public headers: Record<string, string> = {}; //TODO: case insensitive
     private _requestOptions: Record<string, RequestOption> = {}; //TODO: case insensitive
@@ -119,7 +116,7 @@ export class RequestInformation {
      */
     public setQueryStringParametersFromRawObject = (q: object): void => {
         Object.entries(q).forEach(([k, v]) => {
-            this.queryParameters.set(k, v as string);
+            this.queryParameters[k] = v as string;
         });
     }
 }
